@@ -1,0 +1,19 @@
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+tutorial_instalaco

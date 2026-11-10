@@ -1,0 +1,228 @@
+
+
+1- criar a pasta .venv no projeto e deixar ela ativada no cmd
+python -m venv .venv
+.venv\Scripts\activate.bat  
+
+
+2- criar main.py e instalar as bibliotecas pelo cmd
+pip install fastapi uvicorn sqlalchemy passlib[bcrypt] python-jose[cryptography] python-dotenv python-multipart sqlalchemy-utils psycopg[binary] psycopg2-binary requests python-dateutil
+
+pip install sqlalchemy-utils psycopg[binary] psycopg2-binary requests python-dateutil
+
+pip install sqlalchemy-utils
+pip install psycopg[binary]
+pip install psycopg2-binary
+pip install python-dateutil
+pip install requests
+pip install lxml
+pip install apscheduler
+
+depois de criar o banco de dados
+pip install alembic
+pip uninstall bcrypt
+pip install bcrypt==4.0.1
+pip install resend
+
+3- depois de escrever o codigo do banco de dados, instalar uma bliblioteca pra adicionar o sistema de migração ao banco de dados 
+depois de criar o banco de dados
+
+primeiro crie um novo projeto na suabase, vá em conectar, va em session pooler
+
+coloque esse codigo no editor sql da supabase
+
+ALTER DATABASE postgres
+SET timezone TO 'America/Sao_Paulo';
+
+SHOW timezone;
+
+------------------------------
+
+pip install alembic
+pip uninstall bcrypt
+pip install bcrypt==4.0.1
+pip install resend
+
+
+-agora inicialize o alemnbic no temrinal
+alembic init alembic
+
+
+-vá no alembic.ini e edidite a linha: sqlalchemy.url = driver://user:pass@localhost/dbname
+-troque o link pelo sqlalchemy.url = placeholder
+
+
+
+
+
+
+- agora va para pasta alembic/env.py
+-agora  adicionar codigos no topo env.py
+
+substitua o codigo da linhba 5 ate a 22 pelo seguimte
+
+from dotenv import load_dotenv
+from alembic import context
+
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+load_dotenv()
+
+# Fetch variables
+USER = os.getenv("user")
+PASSWORD = os.getenv("password")
+HOST = os.getenv("host")
+PORT = os.getenv("port")
+DBNAME = os.getenv("dbname")
+
+# Construct the SQLAlchemy connection string
+DATABASE_URL = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}?sslmode=require"
+
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
+config = context.config
+
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# add your model's MetaData object here
+# for 'autogenerate' support
+# from myapp import mymodel
+# target_metadata = mymodel.Base.metadata
+from models import Base
+target_metadata = Base.metadata
+
+------------
+
+
+
+
+
+-finalmente só falta criar o banco de dados, rode no terminal
+quando for fazer a migração rodar no terminal
+    alembic revision --autogenerate -m "Initial Migration"
+-e para confirmar rode
+    alembic upgrade head
+
+- agora toda vez q for fazer uma edição na codigo do banco(editar criar ou excluir uma tabela), 
+fazer o processo de migração, bastando apenas rodar
+    alembic revision --autogenerate -m "Neew Migration"
+-e para confirmar rode
+    alembic upgrade head
+
+para testes  pip install requests
+
+
+4 - criar endpoints / rotas
+crie novos arquivos para organixar as rotas auth_routes.py
+
+
+5 agora criar o front
+entre com o vs na pasta onde ficar a pasta do front
+
+no terminal:
+npm create vite@latest
+npm install
+npm install axios
+npm install react-router-dom
+npm install tailwindcss @tailwindcss/vite
+npm install lucide-react
+npm install recharts
+
+
+app.jsx deve ficar
+
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from './assets/vite.svg'
+import heroImg from './assets/hero.png'
+import './App.css'
+
+import { useEffect } from "react"
+import axios from "axios"
+
+
+import {
+  BrowserRouter,
+  Routes,
+  Route
+} from "react-router-dom"
+
+import Login from './pages/login'
+// import AppPage from './pages/AppPage'
+import ViewMode from './pages/viewmode'
+
+
+import {Link} from "react-router-dom"
+
+
+function App() {
+
+  return (
+
+    <BrowserRouter>
+
+      <Routes>
+
+        {/* <Route path="/" element={<AppPage />} /> */}
+        <Route path='/login' element={<Login />} />
+        <Route path='/' element={<ViewMode />} />
+
+
+      </Routes>
+
+    </BrowserRouter>
+
+    
+
+  )
+
+}
+
+export default App
+
+----------------------------------------------
+
+vite.config.js deve ficar:
+
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+})
+
+
+Abra o arquivo src/index.css e adicione:
+@import "tailwindcss";
+
+
+no mesmo arquivo comente a parte body e #root
+
+
+
+
+
+
+
+
+
+
+docker compose up -d --build
+uvicorn main:app --reload --port 8001
+
+Starter Kit: acesse http://localhost
+
+Documentação da sua API: acesse http://localhost:8001/docs
+
+Documentação do Starter Kit: acesse http://localhost:8000/docs, se a porta 8000 estiver publicada no Docker.
