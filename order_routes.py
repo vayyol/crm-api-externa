@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from dependencies import pegar_sessao
 from sqlalchemy.orm import Session
-from models import Clientes, EstadosCliente
+from models import Clientes, EstadosCliente, FollowupDismissal
 from schemas import CadastroCliente, DescricaoSchema, EstadoValueSchema
 from security import validar_api_key
 from security import validar_usuario_integracao
@@ -743,3 +743,108 @@ async def editar_email_cliente(
     session.commit()
 
     return {"message": "E-mail do cliente atualizado com sucesso."}
+
+# FOLLOW-UPS DO DASHBOARD ---------------------------------
+
+@order_router.get("/followups")
+def listar_followups(
+    session: Session = Depends(pegar_sessao),
+    usuario_id: str = Depends(validar_usuario_integracao)
+):
+    hoje = date.today()
+    clientes = session.query(Clientes).filter(
+        Clientes.usuario_externo_id == usuario_id
+    ).all()
+
+    estados = session.query(EstadosCliente).join(
+        Clientes, EstadosCliente.client_id == Clientes.id
+    ).filter(
+        Clientes.usuario_externo_id == usuario_id
+    ).order_by(EstadosCliente.created_at.desc(), EstadosCliente.id.desc()).all()
+
+    estados_por_cliente = {}
+    for estado in estados:
+        estados_por_cliente.setdefault(estado.client_id, estado)
+
+    dispensados = {
+        item.followup_key
+        for item in session.query(FollowupDismissal).filter(
+            FollowupDismissal.usuario_externo_id == usuario_id
+        ).all()
+    }
+
+    followups = []
+
+    def adicionar(regra, cliente, referencia, dias, titulo, descricao):
+        chave = f"{regra}:{cliente.id}:{referencia}"
+        if chave in dispensados:
+            return
+        followups.append({
+            "key": chave,
+            "regra": regra,
+            "client_id": cliente.id,
+            "nome": cliente.nome,
+            "telefone": cliente.telefone,
+            "email": cliente.email,
+            "titulo": titulo,
+            "descricao": descricao,
+            "dias": dias,
+            "created_at": referencia.created_at if hasattr(referencia, "created_at") else referencia,
+        })
+
+    for cliente in clientes:
+        ultimo_estado = estados_por_cliente.get(cliente.id)
+
+        if not ultimo_estado:
+            data_cadastro = cliente.created_at.date() if isinstance(cliente.created_at, datetime) else cliente.created_at
+            dias = (hoje - data_cadastro).days if data_cadastro else 0
+            if dias >= 2:
+                adicionar("sem_estado", cliente, "cadastro", dias, "Cliente sem estado registrado",
+                          "Este cliente foi cadastrado e ainda não recebeu nenhuma etapa.")
+            continue
+
+        data_estado = ultimo_estado.created_at.date() if isinstance(ultimo_estado.created_at, datetime) else ultimo_estado.created_at
+        dias = (hoje - data_estado).days if data_estado else 0
+
+        if ultimo_estado.tipo == "PROPOSTA" and ultimo_estado.status == "ABERTO" and dias >= 1:
+            adicionar("orcamento", cliente, ultimo_estado.id, dias, "Orçamento sem resposta",
+                      "A proposta continua aberta e está aguardando uma resposta.")
+
+        elif ultimo_estado.tipo == "VENDA_NAO_REALIZADA" and dias >= 5:
+            adicionar("venda_nao_realizada", cliente, ultimo_estado.id, dias, "Venda não realizada",
+                      "Já passou um tempo desde a tentativa de venda. Talvez seja uma oportunidade de reativar este cliente.")
+
+        elif ultimo_estado.tipo == "VENDA_REALIZADA" and dias >= 30:
+            adicionar("pos_venda", cliente, ultimo_estado.id, dias, "Acompanhamento pós-venda",
+                      "O cliente realizou uma compra há mais de 30 dias e não teve uma nova etapa registrada.")
+
+        elif ultimo_estado.status == "ABERTO" and ultimo_estado.tipo != "VENDA_REALIZADA" and dias >= 2:
+            adicionar("estado_aberto", cliente, ultimo_estado.id, dias, "Etapa aberta sem avanço",
+                      f"A etapa {ultimo_estado.tipo.replace('_', ' ').lower()} permanece aberta há {dias} dias.")
+
+    followups.sort(key=lambda item: (item["dias"] * -1, item["nome"] or ""))
+    return {"followups": followups}
+
+
+@order_router.post("/dispensar-followup")
+def dispensar_followup(
+    followup_key: str = Body(..., embed=True),
+    session: Session = Depends(pegar_sessao),
+    usuario_id: str = Depends(validar_usuario_integracao)
+):
+    if not followup_key or len(followup_key) > 120:
+        raise HTTPException(status_code=400, detail="Notificação inválida.")
+
+    existente = session.query(FollowupDismissal).filter(
+        FollowupDismissal.usuario_externo_id == usuario_id,
+        FollowupDismissal.followup_key == followup_key
+    ).first()
+
+    if not existente:
+        session.add(FollowupDismissal(
+            usuario_externo_id=usuario_id,
+            followup_key=followup_key
+        ))
+        session.commit()
+
+    return {"message": "Follow-up dispensado com sucesso."}

@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, func, ForeignKey, Text, DECIMAL
+from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, func, ForeignKey, Text, DECIMAL, UniqueConstraint
 from sqlalchemy.orm import declarative_base
 from dotenv import load_dotenv
 import os
@@ -66,3 +66,14 @@ class EstadosCliente(Base):
         self.quant_quitada = quant_quitada
         self.data_vencimento = data_vencimento
         self.estado_anterior = estado_anterior
+
+class FollowupDismissal(Base):
+    __tablename__ = "followup_dismissals"
+    __table_args__ = (
+        UniqueConstraint("usuario_externo_id", "followup_key", name="uq_followup_user_key"),
+    )
+
+    id = Column(Integer, primary_key=True, auto_increment=True)
+    usuario_externo_id = Column(String(36), nullable=False, index=True)
+    followup_key = Column(String(120), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
